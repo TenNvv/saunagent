@@ -1,0 +1,35 @@
+{
+  "name": "saunagent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A personal task room in your terminal, powered by Pi Durable",
+  "bin": {
+    "saunagent": "scripts/start.mjs"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsc",
+    "start": "node scripts/start.mjs",
+    "test": "tsx --test --test-isolation=none test/*.test.ts",
+    "check": "tsc --noEmit"
+  },
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "dependencies": {
+    "@earendil-works/chord": "1.4.0",
+    "@earendil-works/pi-ai": "1.4.0",
+    "@earendil-works/pi-coding-agent": "1.4.0",
+    "@earendil-works/pi-durable": "1.4.0",
+    "ink": "6.3.1",
+    "react": "19.2.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.2.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.9.0"
+  },
+  "overrides": { "undici": "8.12.2" }
+}

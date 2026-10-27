@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.saunagent/
+*.sqlite*
+*.log
+auth.json
+.saunagent-build-*/
