@@ -1,39 +1,91 @@
-import { test } from 'node:test';
-import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, symlinkSync, rmSync, readdirSync } from 'node:fs';
-import { join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
-import { spawn } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  symlinkSync,
+  rmSync,
+  readdirSync,
+} from "node:fs";
+import { join, resolve } from "node:path";
+import { tmpdir } from "node:os";
+import { spawn } from "node:child_process";
+import { pathToFileURL } from "node:url";
 
 async function launchFixture(code: string) {
-  const directory = mkdtempSync(join(tmpdir(), 'saunagent-launcher-'));
+  const directory = mkdtempSync(join(tmpdir(), "saunagent-launcher-"));
   try {
-    mkdirSync(join(directory, 'src'));
-    symlinkSync(resolve('node_modules'), join(directory, 'node_modules'), 'dir');
-    writeFileSync(join(directory, 'package.json'), '{"type":"module"}');
-    writeFileSync(join(directory, 'tsconfig.json'), JSON.stringify({ compilerOptions: { target: 'ES2023', module: 'NodeNext', moduleResolution: 'NodeNext', skipLibCheck: true, rootDir: 'src', types: ['node'] }, include: ['src/**/*.ts'] }));
-    const source = join(directory, 'src/cli.ts');
+    mkdirSync(join(directory, "src"));
+    symlinkSync(
+      resolve("node_modules"),
+      join(directory, "node_modules"),
+      "dir",
+    );
+    writeFileSync(join(directory, "package.json"), '{"type":"module"}');
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          target: "ES2023",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          skipLibCheck: true,
+          rootDir: "src",
+          types: ["node"],
+        },
+        include: ["src/**/*.ts"],
+      }),
+    );
+    const source = join(directory, "src/cli.ts");
     writeFileSync(source, code);
-    const entry = join(directory, 'start.mjs');
-    writeFileSync(entry, `import {main} from ${JSON.stringify(pathToFileURL(resolve('scripts/start.mjs')).href)}; await main(${JSON.stringify([source])},${JSON.stringify(directory)});`);
-    const result = await new Promise<{ code: number | null; output: string }>((resolveResult, reject) => {
-      const child = spawn(process.execPath, [entry], { stdio: ['ignore', 'pipe', 'pipe'] });
-      let output = '';
-      const timeout = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('launcher timed out: ' + output)); }, 55000);
-      child.stdout.on('data', chunk => { output += chunk.toString(); });
-      child.stderr.on('data', chunk => { output += chunk.toString(); });
-      child.once('error', reject);
-      child.once('exit', code => { clearTimeout(timeout); resolveResult({ code, output }); });
-    });
+    const entry = join(directory, "start.mjs");
+    writeFileSync(
+      entry,
+      `import {main} from ${JSON.stringify(pathToFileURL(resolve("scripts/start.mjs")).href)}; await main(${JSON.stringify([source])},${JSON.stringify(directory)});`,
+    );
+    const result = await new Promise<{ code: number | null; output: string }>(
+      (resolveResult, reject) => {
+        const child = spawn(process.execPath, [entry], {
+          stdio: ["ignore", "pipe", "pipe"],
+        });
+        let output = "";
+        const timeout = setTimeout(() => {
+          child.kill("SIGTERM");
+          reject(new Error("launcher timed out: " + output));
+        }, 55000);
+        child.stdout.on("data", (chunk) => {
+          output += chunk.toString();
+        });
+        child.stderr.on("data", (chunk) => {
+          output += chunk.toString();
+        });
+        child.once("error", reject);
+        child.once("exit", (code) => {
+          clearTimeout(timeout);
+          resolveResult({ code, output });
+        });
+      },
+    );
     assert.equal(result.code, 0, result.output);
-    assert.equal(readdirSync(directory).some(name => name.startsWith('.saunagent-build-')), false);
+    assert.equal(
+      readdirSync(directory).some((name) =>
+        name.startsWith(".saunagent-build-"),
+      ),
+      false,
+    );
     return result.output;
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
-test('launcher builds latest source, survives a failed reload, and starts the corrected version without another npm start', { timeout: 60000 }, async () => {
-  const output = await launchFixture(`import {readFileSync,writeFileSync} from 'node:fs';
+test(
+  "launcher builds latest source, survives a failed reload, and starts the corrected version without another npm start",
+  { timeout: 60000 },
+  async () => {
+    const output =
+      await launchFixture(`import {readFileSync,writeFileSync} from 'node:fs';
 const version = Number(1);
 process.send!({type:'ready'});
 if (version === 1) {
@@ -52,13 +104,18 @@ if (version === 1) {
   });
 } else {console.log('NEW_VERSION_READY');process.disconnect();}
 `);
-  assert.match(output, /OLD_WORKER_READY/);
-  assert.match(output, /BUILD_REJECTED_OLD_WORKER_ALIVE/);
-  assert.match(output, /NEW_VERSION_READY/);
-});
+    assert.match(output, /OLD_WORKER_READY/);
+    assert.match(output, /BUILD_REJECTED_OLD_WORKER_ALIVE/);
+    assert.match(output, /NEW_VERSION_READY/);
+  },
+);
 
-test('launcher rolls back a version that compiles but crashes before the TUI is ready', { timeout: 60000 }, async () => {
-  const output = await launchFixture(`import {readFileSync,writeFileSync} from 'node:fs';
+test(
+  "launcher rolls back a version that compiles but crashes before the TUI is ready",
+  { timeout: 60000 },
+  async () => {
+    const output =
+      await launchFixture(`import {readFileSync,writeFileSync} from 'node:fs';
 const version = Number(1);
 if(version===2) throw new Error('INTENTIONAL_NEW_VERSION_STARTUP_FAILURE');
 process.send!({type:'ready'});
@@ -79,7 +136,8 @@ else{
   process.send!({type:'reload'});
 }
 `);
-  assert.match(output, /INTENTIONAL_NEW_VERSION_STARTUP_FAILURE/);
-  assert.match(output, /OLD_VERSION_RESTORED/);
-  assert.match(output, /RECOVERED_NEW_VERSION_READY/);
-});
+    assert.match(output, /INTENTIONAL_NEW_VERSION_STARTUP_FAILURE/);
+    assert.match(output, /OLD_VERSION_RESTORED/);
+    assert.match(output, /RECOVERED_NEW_VERSION_READY/);
+  },
+);

@@ -1,6 +1,15 @@
-import { randomUUID } from 'node:crypto';
-import { closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { randomUUID } from "node:crypto";
+import {
+  closeSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  renameSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { join } from "node:path";
 
 export interface HistoryDraft {
   draft: string;
@@ -15,12 +24,17 @@ export class InputHistory {
   private savedDraft: HistoryDraft | undefined;
 
   constructor(private readonly directory: string) {
-    this.path = join(directory, 'input-history.json');
+    this.path = join(directory, "input-history.json");
     try {
-      const stored: unknown = JSON.parse(readFileSync(this.path, 'utf8'));
+      const stored: unknown = JSON.parse(readFileSync(this.path, "utf8"));
       if (Array.isArray(stored)) {
         for (const text of stored) {
-          if (typeof text === 'string' && text.trim() && this.items.at(-1) !== text) this.items.push(text);
+          if (
+            typeof text === "string" &&
+            text.trim() &&
+            this.items.at(-1) !== text
+          )
+            this.items.push(text);
         }
         this.items = this.items.slice(-100);
       }
@@ -29,7 +43,9 @@ export class InputHistory {
     }
   }
 
-  get entries(): readonly string[] { return [...this.items]; }
+  get entries(): readonly string[] {
+    return [...this.items];
+  }
 
   add(text: string): void {
     this.resetNavigation();
@@ -39,16 +55,24 @@ export class InputHistory {
     // A fresh exclusive file ensures 0600 even if an older history was public.
     const temporary = `${this.path}.${randomUUID()}.tmp`;
     try {
-      const fd = openSync(temporary, 'wx', 0o600);
+      const fd = openSync(temporary, "wx", 0o600);
       try {
-        writeFileSync(fd, JSON.stringify(entries, null, 2) + '\n');
+        writeFileSync(fd, JSON.stringify(entries, null, 2) + "\n");
         fsyncSync(fd);
-      } finally { closeSync(fd); }
+      } finally {
+        closeSync(fd);
+      }
       renameSync(temporary, this.path);
       this.items = entries;
-      const directoryFd = openSync(this.directory, 'r');
-      try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
-    } finally { rmSync(temporary, { force: true }); }
+      const directoryFd = openSync(this.directory, "r");
+      try {
+        fsyncSync(directoryFd);
+      } finally {
+        closeSync(directoryFd);
+      }
+    } finally {
+      rmSync(temporary, { force: true });
+    }
   }
 
   navigate(direction: -1 | 1, draft: string, cursor: number): HistoryDraft {
