@@ -400,7 +400,7 @@ export function App({
       <Box justifyContent="space-between">
         <Text bold> saunagent</Text>
         <Text dimColor>
-          {demo ? "Demo mode · No tools executed" : "Pi Durable"}{" "}
+          {demo ? "Demo mode · No tools executed" : "Pi"}{" "}
         </Text>
       </Box>
       <Box flexGrow={1}>

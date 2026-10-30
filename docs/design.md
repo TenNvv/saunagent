@@ -37,6 +37,8 @@
 
 ## 技术基线
 
-Pi Durable `1.4.0`、Pi AI、Chord、Node SQLite；React + Ink 实现 TUI。独立任务 Harness 加 room 投递记录，通过 request ID 和结果 entry ID 协调恢复和去重。只读恢复和真实外部副作用验收分别验证。
+Pi coding agent `1.4.0`（`createAgentSession` / `AgentSession` / `SessionManager`）、Pi AI、Node SQLite（仅 room 历史摘要）；React + Ink 实现 TUI。每个任务一个 JSONL 会话，room 投递记录用 `saunagent.delivery` 自定义条目标记。恢复时继续未完成会话，答案按会话 leaf entry ID 去重。主管和历史总结是一次性内存会话。
 
-官方依据：[Pi Durable 文档](https://github.com/earendil-works/pi/blob/main/packages/durable/README.md)、[后台 subagent 示例](https://github.com/earendil-works/pi/blob/main/packages/durable/test/examples/22-subagent-background.ts)。实现以安装版本的实际导出与类型为准。
+和 Pi Durable 的差异：没有提交重放；优雅退出会等已开始的工具结束，但崩溃在工具结果写入前不能重放该工具；aborted 助手消息在恢复时从模型上下文省略后再继续；内部 subagent 不单独落盘；同轮 steer 与原投递可能共用一个答案 ID。自动 compaction 与 cache warming 关闭。旧的 `*.sqlite` harness 文件不再使用。
+
+官方依据：[Pi SDK](https://github.com/earendil-works/pi/blob/main/packages/coding-agent/docs/sdk.md)。实现以安装版本的实际导出与类型为准。
