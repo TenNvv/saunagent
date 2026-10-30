@@ -10,21 +10,41 @@ import {
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { setTimeout as delay } from "node:timers/promises";
-import { BACKGROUND_CONTEXT } from "@earendil-works/chord/context";
-import { Harness, createRegistry } from "@earendil-works/pi-durable";
-import { openNodeSqliteStorage } from "@earendil-works/pi-durable/storage/sqlite/node";
 import { createModels } from "@earendil-works/pi-ai/models";
 import {
   fauxProvider,
   fauxAssistantMessage,
   fauxToolCall,
 } from "@earendil-works/pi-ai/providers/faux";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { RoomStore } from "../src/store.js";
 import { Room } from "../src/room.js";
-import { PiEngine, demoModels } from "../src/pi.js";
+import { PiEngine, taskSessionPath } from "../src/pi.js";
+
+function messageText(message: { content: unknown }) {
+  const content = message.content;
+  if (typeof content === "string") return content;
+  if (!Array.isArray(content)) return "";
+  return content
+    .filter(
+      (block): block is { type: "text"; text: string } =>
+        !!block &&
+        typeof block === "object" &&
+        (block as { type?: string }).type === "text" &&
+        typeof (block as { text?: unknown }).text === "string",
+    )
+    .map((block) => block.text)
+    .join("\n");
+}
+
+function transcript(directory: string, taskId: string) {
+  return SessionManager.open(
+    taskSessionPath(directory, taskId),
+  ).buildSessionContext().messages;
+}
 
 test(
-  "real Pi Durable + SQLite: routing, context continuity, and reopen without executing work",
+  "coding-agent sessions: routing, context continuity, and reopen without executing work",
   { timeout: 20000 },
   async () => {
     const directory = mkdtempSync(join(tmpdir(), "saunagent-pi-"));
@@ -35,7 +55,7 @@ test(
       await room.send("检查播放器启动");
       await room.waitForIdle();
       const task = room.state.tasks[0]!;
-      assert.ok(existsSync(join(directory, `${task.id}.sqlite`)));
+      assert.ok(existsSync(taskSessionPath(directory, task.id)));
       assert.match(task.summary, /retained 1 user inputs/);
       await room.send("继续看初始化路径", task.id);
       await room.waitForIdle();
@@ -86,20 +106,14 @@ test(
         1,
       );
       await room.stop();
-      const harness = await Harness.open(
-        await openNodeSqliteStorage(join(directory, `${task.id}.sqlite`)),
-        { models: demoModels(), registry: createRegistry() },
-        BACKGROUND_CONTEXT,
-      );
-      const root = await harness.root(BACKGROUND_CONTEXT);
-      const transcript = await root.context(BACKGROUND_CONTEXT);
+      const messages = transcript(directory, task.id);
       assert.equal(
-        transcript.messages.filter(
-          (m) => m.role === "user" && m.content === "原文不能丢失",
+        messages.filter(
+          (message) =>
+            message.role === "user" && messageText(message) === "原文不能丢失",
         ).length,
         1,
       );
-      await harness.close(BACKGROUND_CONTEXT);
     } finally {
       await engine.close(true);
       store.release();
@@ -149,22 +163,16 @@ test(
       assert.ok(existsSync(join(directory, "first.txt")));
       assert.equal(existsSync(join(directory, "second.txt")), false);
       assert.equal(room.state.deliveries[0]!.status, "queued");
-      // After close, inspect the actual stored transcript without starting the scheduler.
-      const harness = await Harness.open(
-        await openNodeSqliteStorage(join(directory, `${task.id}.sqlite`)),
-        { models, registry: createRegistry() },
-        BACKGROUND_CONTEXT,
-      );
-      const root = await harness.root(BACKGROUND_CONTEXT);
-      const transcript = await root.context(BACKGROUND_CONTEXT);
+      // After close, inspect the stored transcript without starting another session.
+      const messages = transcript(directory, task.id);
       assert.equal(
-        transcript.messages.filter(
-          (m) => m.role === "user" && m.content === "run both tools",
+        messages.filter(
+          (message) =>
+            message.role === "user" && messageText(message) === "run both tools",
         ).length,
         1,
       );
-      assert.ok(transcript.messages.some((m) => m.role === "toolResult"));
-      await harness.close(BACKGROUND_CONTEXT);
+      assert.ok(messages.some((message) => message.role === "toolResult"));
     } finally {
       await engine.close(true);
       store.release();
@@ -364,7 +372,7 @@ test(
         assert.ok(
           request.messages.some(
             (message) =>
-              message.role === "user" && message.content === original,
+              message.role === "user" && messageText(message) === original,
           ),
         );
         return fauxAssistantMessage("已检查日志。");

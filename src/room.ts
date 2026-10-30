@@ -323,7 +323,8 @@ export class Room extends EventEmitter {
         const summary = await this.engine.summarize!(task, messages);
         if (this.stopping || this.suspended)
           throw new Error("Clearing cancelled; task history is preserved.");
-        // Close the old Harness before switching sessions. Do not delete its SQLite.
+        // Close the current coding-agent session before switching memory generations.
+        // Keep its JSONL transcript.
         await this.engine.pause(task.id);
         this.store.memory.save(task, summary, messages);
         this.enabled.delete(task.id);
@@ -423,7 +424,7 @@ export class Room extends EventEmitter {
     }
     this.changed();
     await Promise.all(tasks.map((t) => this.engine.pause(t.id, force)));
-    // Join result handlers before allowing a reopen of the same SQLite file.
+    // Join result handlers before allowing a reopen of the same session file.
     await Promise.all(
       tasks.flatMap((t) => [...(this.running.get(t.id) ?? [])]),
     );
@@ -473,7 +474,7 @@ export class Room extends EventEmitter {
       )!;
       const jobs = this.running.get(task.id) ?? new Set<Promise<void>>();
       this.running.set(task.id, jobs);
-      // Persist intent before submitting to Durable. requestId bridges a crash between stores.
+      // Persist the delivery before the engine submits it. The delivery id is the resume key.
       this.changed();
       const job = Promise.resolve()
         .then(() => this.engine.run(task, message, delivery))

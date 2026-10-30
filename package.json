@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "A personal task room in your terminal, powered by Pi Durable",
+  "description": "A personal task room in your terminal, powered by Pi",
   "bin": {
     "saunagent": "scripts/start.mjs"
   },
@@ -11,17 +11,15 @@
     "dev": "tsx src/cli.tsx",
     "build": "tsc",
     "start": "node scripts/start.mjs",
-    "test": "tsx --test --test-isolation=none test/*.test.ts",
+    "test": "node scripts/test.mjs",
     "check": "tsc --noEmit"
   },
   "engines": {
     "node": ">=22.19.0"
   },
   "dependencies": {
-    "@earendil-works/chord": "1.4.0",
     "@earendil-works/pi-ai": "1.4.0",
     "@earendil-works/pi-coding-agent": "1.4.0",
-    "@earendil-works/pi-durable": "1.4.0",
     "ink": "6.3.1",
     "react": "19.2.0"
   },

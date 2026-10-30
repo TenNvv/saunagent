@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { RoomStore } from "../src/store.js";
 import { Room } from "../src/room.js";
-import { PiEngine } from "../src/pi.js";
+import { PiEngine, taskSessionPath } from "../src/pi.js";
 import { command } from "../src/commands.js";
 
 test("clear commits SQLite memory, preserves old transcript, resets session and restores after restart", async () => {
@@ -24,7 +24,7 @@ test("clear commits SQLite memory, preserves old transcript, resets session and 
     assert.notEqual(task.status, "completed");
     assert.match(task.memorySummary!, /保留历史目标/);
     assert.equal(store.memory.list(task.id).length, 1);
-    assert.ok(existsSync(join(dir, `${task.id}.sqlite`)));
+    assert.ok(existsSync(taskSessionPath(dir, task.id)));
     await room.clear(task.id);
     assert.equal(store.memory.list().length, 1);
     await room.stop();
@@ -39,7 +39,7 @@ test("clear commits SQLite memory, preserves old transcript, resets session and 
     assert.equal(restored.archived, false);
     assert.match(restored.summary, /retained 1 user inputs/);
     assert.ok(
-      existsSync(join(dir, `${task.id}.${restored.memorySession}.sqlite`)),
+      existsSync(taskSessionPath(dir, task.id, restored.memorySession)),
     );
     await command(room, "/memory");
     assert.match(room.state.messages.at(-1)!.text, /保留历史目标/);
